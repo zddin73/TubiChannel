@@ -1,4 +1,4 @@
-# app/scrapers/tubi.py
+# tubi_scraper.py
 """
 Tubi TV scraper for FastChannels.
 
