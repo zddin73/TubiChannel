@@ -3,6 +3,7 @@
 import xml.etree.ElementTree as ET
 from datetime import datetime, timezone
 import logging
+from urllib.parse import urlparse, urlunparse
 
 # Import your scraper class
 from tubi_scraper import TubiScraper
@@ -11,7 +12,7 @@ from tubi_scraper import TubiScraper
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 
 def generate_m3u(scraper, channels, filename="tubi_playlist.m3u"):
-    """Generates an M3U8 playlist file with real https:// stream URLs."""
+    """Generates an M3U8 playlist file with clean stream URLs (token removed)."""
     with open(filename, "w", encoding="utf-8") as f:
         f.write("#EXTM3U\n")
         for ch in channels:
@@ -27,6 +28,17 @@ def generate_m3u(scraper, channels, filename="tubi_playlist.m3u"):
                 logging.warning(f"[tubi] Skipping {ch.name} - No valid HTTPS URL found")
                 continue
 
+            # Strip query parameters (tokens, session IDs, content IDs) from the URL
+            parsed_url = urlparse(real_url)
+            clean_url = urlunparse((
+                parsed_url.scheme,
+                parsed_url.netloc,
+                parsed_url.path,
+                '',  # Remove params
+                '',  # Remove query string (tokens)
+                ''   # Remove fragment
+            ))
+
             # Build standard IPTV metadata tags
             tvg_id = f' tvg-id="{ch.source_channel_id}"'
             tvg_logo = f' tvg-logo="{ch.logo_url}"' if ch.logo_url else ""
@@ -34,7 +46,7 @@ def generate_m3u(scraper, channels, filename="tubi_playlist.m3u"):
             
             # Format: #EXTINF:-1 tvg-id="..." tvg-logo="..." group-title="...", Channel Name
             f.write(f'#EXTINF:-1{tvg_id}{tvg_logo}{group_title},{ch.name}\n')
-            f.write(f'{real_url}\n')
+            f.write(f'{clean_url}\n')
             
     print(f"[Success] M3U Playlist saved to: {filename}")
 
