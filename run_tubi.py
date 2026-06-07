@@ -8,21 +8,31 @@ from tubi_scraper import TubiScraper
 # Setup basic logging to see the script progress
 logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(levelname)s] %(message)s')
 
-def generate_m3u(channels, filename="tubi_playlist.m3u"):
-    """Generates an M3U8 playlist file from the scraped channels."""
+def generate_m3u(scraper, channels, filename="tubi_playlist.m3u"):
+    """Generates an M3U8 playlist file with real https:// stream URLs."""
     with open(filename, "w", encoding="utf-8") as f:
         f.write("#EXTM3U\n")
         for ch in channels:
-            # Build metadata tags (tvg-id, logo, group/category)
+            # Look up the actual live CDN HLS URL from the scraper's cache
+            real_url = scraper._url_cache.get(ch.source_channel_id)
+            
+            # If it's missing from the cache, use resolve() to fetch it live
+            if not real_url:
+                real_url = scraper.resolve(ch.stream_url)
+                
+            # Skip the channel if we still don't have a valid https link
+            if not real_url or not real_url.startswith("https://"):
+                logging.warning(f"[tubi] Skipping {ch.name} - No valid HTTPS URL found")
+                continue
+
+            # Build standard IPTV metadata tags
             tvg_id = f' tvg-id="{ch.source_channel_id}"'
             tvg_logo = f' tvg-logo="{ch.logo_url}"' if ch.logo_url else ""
             group_title = f' group-title="{ch.category}"' if ch.category else ""
             
             # Format: #EXTINF:-1 tvg-id="..." tvg-logo="..." group-title="...", Channel Name
             f.write(f'#EXTINF:-1{tvg_id}{tvg_logo}{group_title},{ch.name}\n')
-            
-            # Use the actual cached stream URL if available, otherwise fall back to the internal URI
-            f.write(f'{ch.stream_url}\n')
+            f.write(f'{real_url}\n')
             
     print(f"[Success] M3U Playlist saved to: {filename}")
 
@@ -39,7 +49,7 @@ def generate_xmltv(channels, programs, filename="tubi_epg.xml"):
         display_name.text = ch.name
         
         if ch.logo_url:
-            logo_elem = ET.SubElement(channel_elem, "icon", src=ch.logo_url)
+            ET.SubElement(channel_elem, "icon", src=ch.logo_url)
 
     # 2. Add <programme> schedules
     for p in programs:
@@ -66,7 +76,7 @@ def generate_xmltv(channels, programs, filename="tubi_epg.xml"):
             desc_elem.text = p.description
 
         if p.poster_url:
-            icon_elem = ET.SubElement(prog_elem, "icon", src=p.poster_url)
+            ET.SubElement(prog_elem, "icon", src=p.poster_url)
 
         if p.rating:
             rating_elem = ET.SubElement(prog_elem, "rating", system="MPAA")
@@ -82,12 +92,12 @@ def generate_xmltv(channels, programs, filename="tubi_epg.xml"):
 
     # Write prettified XML to file
     tree = ET.ElementTree(root)
-    ET.indent(tree, space="  ", level=0)  # Make XML human-readable
+    ET.indent(tree, space="  ", level=0)
     tree.write(filename, encoding="utf-8", xml_declaration=True)
     print(f"[Success] XMLTV EPG saved to: {filename}")
 
 if __name__ == "__main__":
-    # Initialize the scraper (Pass username/password dict here if you want authenticated mode)
+    # If using authentication, fill these out. Otherwise, leave empty strings for anonymous access.
     config_mock = {"username": "", "password": ""} 
     scraper = TubiScraper(config=config_mock)
 
@@ -98,7 +108,8 @@ if __name__ == "__main__":
         print("[Error] No channels scraped. Exiting.")
     else:
         print(f"Step 2: Scraped {len(channels)} channels. Generating M3U...")
-        generate_m3u(channels)
+        # We pass the scraper instance here to read its internal url cache
+        generate_m3u(scraper, channels)
 
         print("Step 3: Fetching EPG data for channels...")
         programs = scraper.fetch_epg(channels)
