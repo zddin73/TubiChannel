@@ -1,7 +1,7 @@
 name: Tubi Scraper
 on:
   schedule:
-    - cron: '0 */6 * * *' # Every 6 hours
+    - cron: '22 2/6 * * *' # Every 6 hours
   workflow_dispatch: # Manual trigger
 
 jobs:
@@ -27,5 +27,5 @@ jobs:
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           git add tubi_playlist.m3u tubi_epg.xml
-          git commit -m "Update TCL playlist and EPG with integrated URL" || exit 0
+          git commit -m "Update Tubi playlist and EPG" || exit 0
           git push
