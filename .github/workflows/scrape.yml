@@ -1,7 +1,7 @@
 name: Tubi Scraper
 on:
   schedule:
-    - cron: '22 2/6 * * *' # Every 6 hours
+    - cron: '23 2/6 * * *' # Every 6 hours
   workflow_dispatch: # Manual trigger
 
 jobs:
